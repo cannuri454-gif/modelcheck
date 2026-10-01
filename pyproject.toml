@@ -1,0 +1,9 @@
+[project]
+name = "modelcheck-desktop"
+version = "0.1.0"
+description = "Local, repeatable evaluation checks for binary classification datasets."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
