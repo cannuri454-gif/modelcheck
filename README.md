@@ -28,7 +28,7 @@ No AI API, account, server, subscription or GPU is required. Dataset loading and
 
 ## Run it
 
-The tested environment is **Windows 11, Python 3.12**. Python 3.12–3.14 can install the pinned packages, but other Python versions and operating systems have not been tested here.
+The tested environment is **Windows 11, Python 3.12**. Other Python versions and operating systems have not been tested here.
 
 ```powershell
 git clone https://github.com/cannuri454-gif/modelcheck.git
@@ -132,9 +132,12 @@ CSV / synthetic demo -> validation -> split membership
 Build an unsigned development folder on Windows:
 
 ```powershell
-.\.venv\Scripts\python -m PyInstaller --noconfirm --clean --onedir --windowed --name ModelCheck --exclude-module matplotlib --exclude-module pytest run.py
+.\.venv\Scripts\python -m PyInstaller --noconfirm --clean ModelCheck.spec
+.\dist\ModelCheck\ModelCheck.exe --self-test
 .\.venv\Scripts\python tools/collect_licenses.py dist/ModelCheck
 ```
+
+The build specification uses Windows' native ICU library rather than bundling a conflicting DLL from the Python environment. The workflow runs `--self-test` on the packaged application to exercise actual Qt imports, widgets, model evaluation and persistence.
 
 See [verification notes](docs/verification.md) for the checked environment and current limits. Contributions should include a reproducible example and appropriate tests. Use fictional data when opening an issue; never attach private datasets or your history database.
 

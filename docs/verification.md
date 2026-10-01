@@ -2,10 +2,11 @@
 
 Checked locally on Windows 11 with Python 3.12.14 on 2 October 2026.
 
-- `python -m pytest -q`: 26 tests passed in the initial complete test run.
+- `python -m pytest -q`: 26 tests passed, including the final application changes.
 - `python -m bandit -r modelcheck run.py`: no flagged issues.
 - `python -m pip_audit -r requirements.txt -r requirements-dev.txt`: no known vulnerabilities found at the time of the audit.
 - Opened the actual Qt application, ran the synthetic demonstration, and captured the setup and results views directly from the real widgets without a cursor overlay.
+- The Windows folder build passed `ModelCheck.exe --self-test` with exit code 0. This starts Qt, runs the demonstration, fills the results table and saves an experiment in a temporary database. The build uses Windows' native ICU library; an incompatible library collected from the development environment is excluded by the checked-in packaging specification.
 - Default synthetic demo: logistic regression balanced accuracy 1.000 (random), approximately 0.503 (new groups), and 1.000 (future records). These fictional data deliberately contain an alternative customer identifier; they are not a real-world performance claim.
 
 Tests verify training-only preprocessing, group separation, chronological boundaries and date ties, deterministic random membership, known confusion matrices/metrics, duplicate counts, input validation, cancellation, persistence, report escaping, the background Qt worker and restoration of saved experiment settings.

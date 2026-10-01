@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
@@ -737,6 +738,17 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName('ModelCheck')
     app.setOrganizationName('ModelCheck')
+    if '--self-test' in sys.argv:
+        # Exercise the actual frozen imports, widgets, models and report persistence.
+        with tempfile.TemporaryDirectory() as temporary:
+            window = MainWindow(History(Path(temporary) / 'experiments.sqlite3'))
+            window.load_demo()
+            report = run_experiment(window.dataset, window.get_config())
+            window.receive_report(report)
+            if window.result_table.rowCount() != 9 or len(window.history.list()) != 1:
+                raise RuntimeError('Packaged app self-test failed.')
+            window.close()
+        return 0
     window = MainWindow()
     window.show()
     if '--demo' in sys.argv:

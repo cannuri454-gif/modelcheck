@@ -6,6 +6,7 @@ __pycache__/
 build/
 dist/
 *.spec
+!ModelCheck.spec
 *.sqlite3
 *.sqlite3-*
 *.csv

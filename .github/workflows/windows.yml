@@ -22,7 +22,12 @@ jobs:
       - name: Audit dependencies
         run: python -m pip_audit -r requirements.txt -r requirements-dev.txt
       - name: Build development folder
-        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name ModelCheck --exclude-module matplotlib --exclude-module pytest run.py
+        run: python -m PyInstaller --noconfirm --clean ModelCheck.spec
+      - name: Exercise the packaged application
+        run: |
+          $process = Start-Process -FilePath 'dist/ModelCheck/ModelCheck.exe' -ArgumentList '--self-test' -PassThru -WindowStyle Hidden
+          if (-not $process.WaitForExit(120000)) { throw 'Packaged app self-test timed out.' }
+          if ($process.ExitCode -ne 0) { throw "Packaged app exited with code $($process.ExitCode)." }
       - name: Preserve dependency notices
         run: python tools/collect_licenses.py dist/ModelCheck
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
