@@ -1,9 +1,27 @@
 """Portable reports with escaped input and no executable content."""
 import html
 import json
+import os
+from pathlib import Path
+import tempfile
 
 LABELS = {'random': 'Random split', 'group': 'New groups', 'time': 'Future records',
           'baseline': 'Majority baseline', 'logistic': 'Logistic regression', 'forest': 'Random forest'}
+
+
+def write_report(report: dict, destination: Path, use_json: bool) -> None:
+    """Replace a report only after a complete, flushed temporary write."""
+    text = to_json(report) if use_json else to_html(report)
+    descriptor, name = tempfile.mkstemp(prefix='.modelcheck-', suffix='.tmp', dir=destination.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, 'w', encoding='utf-8', newline='') as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def to_json(report: dict) -> str:

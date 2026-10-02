@@ -51,6 +51,7 @@ class Dataset:
     frame: pd.DataFrame
     name: str
     sha256: str
+    source_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,8 @@ def load_csv(path: str | Path) -> Dataset:
         raise CheckError('This version supports CSV files up to 100 MB.')
     try:
         text = raw.decode('utf-8-sig')
+        if '\x00' in text:
+            raise CheckError('CSV text must not contain null bytes.')
         reader = csv.reader(io.StringIO(text), strict=True)
         header = next(reader)
         if not header or any(not c.strip() for c in header):
@@ -97,7 +100,7 @@ def load_csv(path: str | Path) -> Dataset:
         raise CheckError('Use a non-empty, comma-separated UTF-8 CSV with a header.') from exc
     if len(frame) < 20:
         raise CheckError('Use at least 20 records so the train/test checks have enough data.')
-    return Dataset(frame, path.name, hashlib.sha256(raw).hexdigest())
+    return Dataset(frame, path.name, hashlib.sha256(raw).hexdigest(), path.resolve())
 
 
 def demo_dataset() -> Dataset:
@@ -151,6 +154,8 @@ def validate(dataset: Dataset, config: Config) -> tuple[pd.DataFrame, pd.Series,
         raise CheckError('Choose each testing method once.')
     if not config.models or set(config.models) - {'logistic', 'forest'}:
         raise CheckError('Choose logistic regression, random forest, or both.')
+    if len(set(config.models)) != len(config.models):
+        raise CheckError('Choose each model once.')
     if not 0.1 <= config.test_size <= 0.4 or not 0 <= config.seed <= 2**31 - 1:
         raise CheckError('Use a test fraction from 10% to 40% and a non-negative seed below 2^31.')
     if frame[config.target].isna().any():
@@ -167,6 +172,8 @@ def validate(dataset: Dataset, config: Config) -> tuple[pd.DataFrame, pd.Series,
     if config.group and (frame[config.group].isna().any() or frame[config.group].nunique() < 2):
         raise CheckError('Group IDs must be complete, with at least two different groups.')
     if config.time:
+        if pd.api.types.is_numeric_dtype(frame[config.time]):
+            raise CheckError('Use written dates such as 2026-10-02, rather than numbers interpreted as timestamps.')
         dates = pd.to_datetime(frame[config.time], errors='coerce', utc=True, format='mixed')
         if dates.isna().any() or dates.nunique() < 2:
             raise CheckError('Dates must all be readable, with at least two different timestamps.')
@@ -177,6 +184,8 @@ def validate(dataset: Dataset, config: Config) -> tuple[pd.DataFrame, pd.Series,
             x[column] = pd.to_numeric(x[column], errors='coerce').astype(float)
             if np.isinf(x[column]).any():
                 raise CheckError(f'Feature {column!r} contains infinity. Resolve it first.')
+            if (x[column].abs() > 1e100).any():
+                raise CheckError(f'Feature {column!r} contains numbers too large for stable calculation.')
         else:
             x[column] = x[column].map(lambda v: str(v) if pd.notna(v) else np.nan).astype(object)
             if x[column].nunique() > MAX_CATEGORY_LEVELS:
@@ -233,7 +242,7 @@ def build_pipeline(x: pd.DataFrame, model: str, seed: int) -> Pipeline:
                                             random_state=seed, n_jobs=1)
     else:
         estimator = DummyClassifier(strategy='most_frequent')
-    return Pipeline([('prepare', ColumnTransformer(blocks)), ('model', estimator)])
+    return Pipeline([('prepare', ColumnTransformer(blocks, sparse_threshold=1.0)), ('model', estimator)])
 
 
 def audit_split(frame: pd.DataFrame, x: pd.DataFrame, train: np.ndarray, test: np.ndarray, config: Config) -> dict:

@@ -26,6 +26,9 @@ if __name__ == '__main__':
             folder.mkdir(exist_ok=True)
             shutil.copyfile(source, folder / safe)
     root = Path(__file__).resolve().parents[1]
+    python_license = Path(sys.base_prefix) / 'LICENSE.txt'
+    if python_license.is_file():
+        shutil.copyfile(python_license, notices / 'Python-LICENSE.txt')
     for source in [root / 'LICENSE', root / 'THIRD_PARTY.md', *(root / 'licenses').glob('*.txt')]:
         shutil.copyfile(source, notices / source.name)
     print('Dependency notices copied to development distribution.')

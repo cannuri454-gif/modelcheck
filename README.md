@@ -28,6 +28,8 @@ No AI API, account, server, subscription or GPU is required. Dataset loading and
 
 ## Run it
 
+Get the latest unsigned Windows preview from the [Releases page](https://github.com/cannuri454-gif/modelcheck/releases). Extract the whole ZIP and run `ModelCheck.exe`. Check the release verification report and checksum for that download. Preview builds remain alpha.
+
 The tested environment is **Windows 11, Python 3.12**. Other Python versions and operating systems have not been tested here.
 
 ```powershell
@@ -67,6 +69,7 @@ Remove `account_signature` and repeat the experiment to explore how the results 
 - Comma-separated UTF-8 CSV with one header row and unique, non-empty column names.
 - 20–50,000 data records, up to 200 columns and a file size of at most 100 MB.
 - Exactly two target labels, no missing target labels, and at least four records per label.
+- No null bytes in CSV text. Dates must be written as readable dates, not numeric timestamp guesses. Feature magnitudes above 1e100 are rejected to avoid unstable calculations.
 - Each selected test must contain both labels in both training and testing. Otherwise the app stops with an explanation; it does not silently try different seeds until a split looks good.
 - Group IDs must be complete. Dates must be readable; ISO dates such as `2026-10-02` are recommended. Ambiguous day/month formats should be converted before loading.
 - Selected categorical features support up to 300 distinct values each. Exclude free-text fields and irrelevant IDs. Numeric infinities must be resolved first.

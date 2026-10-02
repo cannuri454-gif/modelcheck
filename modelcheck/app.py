@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComb
 
 from .engine import Cancelled, Config, Dataset, demo_dataset, load_csv, run_experiment
 from .history import History
-from .report import LABELS, to_html, to_json
+from .report import LABELS, to_html, to_json, write_report
 
 INK = '#17332f'
 TEAL = '#167d70'
@@ -162,6 +162,7 @@ class MainWindow(QMainWindow):
         self.dataset: Dataset | None = None
         self.current_report = None
         self.task: Task | None = None
+        self.cancel_requested = False
         self.close_pending = False
         self.feature_boxes = []
         self.setWindowTitle('ModelCheck')
@@ -279,7 +280,7 @@ class MainWindow(QMainWindow):
         self.group = QComboBox()
         self.time = QComboBox()
         for combo in (self.group, self.time):
-            combo.currentTextChanged.connect(self.roles_changed)
+            combo.currentIndexChanged.connect(self.roles_changed)
         roles.addWidget(self.group, 1, 0)
         roles.addWidget(self.time, 1, 1)
         setup.addLayout(roles)
@@ -452,8 +453,9 @@ class MainWindow(QMainWindow):
         if self.task is not None:
             return
         self.task = Task(operation, self)
+        self.cancel_requested = False
         self.task.message.connect(self.status.setText)
-        self.task.ready.connect(receive)
+        self.task.ready.connect(lambda result: receive(result) if not self.cancel_requested else None)
         self.task.failed.connect(self.task_error)
         self.task.finished.connect(self.task_finished)
         self.set_busy(True)
@@ -470,11 +472,11 @@ class MainWindow(QMainWindow):
 
     def task_error(self, message: str):
         self.status.setText('Experiment not completed.')
-        if not self.close_pending:
+        if not self.close_pending and not self.cancel_requested:
             QMessageBox.warning(self, 'Please check these settings', message)
 
     def task_finished(self):
-        was_cancelled = self.task.isInterruptionRequested()
+        was_cancelled = self.cancel_requested
         self.task.deleteLater()
         self.task = None
         self.set_busy(False)
@@ -485,6 +487,7 @@ class MainWindow(QMainWindow):
 
     def cancel_task(self):
         if self.task:
+            self.cancel_requested = True
             self.task.requestInterruption()
             self.status.setText('Stopping after the current loading or model-fitting stage...')
 
@@ -553,7 +556,9 @@ class MainWindow(QMainWindow):
             if item.widget():
                 item.widget().deleteLater()
         self.feature_boxes = []
-        excluded = {self.target.currentText(), self.group.currentText(), self.time.currentText()}
+        excluded = {self.target.currentText(),
+                    self.group.currentText() if self.group.currentIndex() > 0 else None,
+                    self.time.currentText() if self.time.currentIndex() > 0 else None}
         for column in self.dataset.frame:
             if column in excluded:
                 continue
@@ -566,8 +571,8 @@ class MainWindow(QMainWindow):
         return Config(target=self.target.currentText(),
                       features=tuple(box.text() for box in self.feature_boxes if box.isChecked()),
                       positive_label=self.positive.currentText(),
-                      group=None if self.group.currentText() == '(none)' else self.group.currentText(),
-                      time=None if self.time.currentText() == '(none)' else self.time.currentText(),
+                      group=None if self.group.currentIndex() == 0 else self.group.currentText(),
+                      time=None if self.time.currentIndex() == 0 else self.time.currentText(),
                       strategies=tuple(k for k, box in self.strategy_boxes.items() if box.isChecked()),
                       models=tuple(k for k, box in self.model_boxes.items() if box.isChecked()),
                       test_size=self.test_fraction.value() / 100, seed=self.seed.value())
@@ -693,8 +698,8 @@ class MainWindow(QMainWindow):
             return
         config = self.current_report['config']
         self.target.setCurrentText(config['target'])
-        self.group.setCurrentText(config['group'] or '(none)')
-        self.time.setCurrentText(config['time'] or '(none)')
+        for combo, role in ((self.group, config['group']), (self.time, config['time'])):
+            combo.setCurrentIndex(next((i for i in range(1, combo.count()) if combo.itemText(i) == role), 0))
         self.positive.setCurrentText(config['positive_label'])
         for box in self.feature_boxes:
             box.setChecked(box.text() in config['features'])
@@ -719,9 +724,17 @@ class MainWindow(QMainWindow):
         if not destination.suffix:
             destination = destination.with_suffix('.json' if use_json else '.html')
         try:
-            destination.write_text(to_json(self.current_report) if use_json else to_html(self.current_report), encoding='utf-8')
+            protected = [self.history.path]
+            if self.dataset and self.dataset.source_path:
+                protected.append(self.dataset.source_path)
+            if destination.suffix.lower() not in {'.html', '.json'} or any(
+                    destination.resolve() == file.resolve() or (destination.exists() and file.exists() and destination.samefile(file))
+                    for file in protected):
+                QMessageBox.warning(self, 'Choose a report filename', 'Use an .html or .json filename separate from your dataset and history database.')
+                return
+            write_report(self.current_report, destination, use_json)
             self.status.setText(f'Report exported: {destination.name}')
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             QMessageBox.warning(self, 'Could not export report', str(exc))
 
     def closeEvent(self, event):
