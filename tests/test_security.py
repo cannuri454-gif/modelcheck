@@ -12,6 +12,7 @@ from scipy.sparse import issparse
 from modelcheck import engine
 from modelcheck.engine import CheckError, Config, Dataset, demo_dataset, load_csv, run_experiment, split_indices, validate
 from modelcheck.history import History
+from modelcheck.history import validate_saved_report
 from modelcheck.report import to_html, to_json, write_report
 
 
@@ -159,3 +160,26 @@ def test_failed_export_preserves_existing_report_and_cleans_temporary(tmp_path, 
         write_report(report, destination, True)
     assert destination.read_text() == 'keep previous report'
     assert list(tmp_path.glob('.modelcheck-*.tmp')) == []
+
+
+@pytest.mark.parametrize('payload', [None, 'not a report', [], {'schema_version': 9, 'results': []}])
+def test_wrong_saved_report_shape_rejected(payload):
+    with pytest.raises(ValueError, match='damaged'):
+        validate_saved_report(payload)
+
+
+def test_invalid_saved_metrics_rejected(sample):
+    data, config = sample
+    report = run_experiment(data, config)
+    report['results'][0]['metrics']['accuracy'] = float('nan')
+    with pytest.raises(ValueError, match='damaged'):
+        validate_saved_report(report)
+
+
+@pytest.mark.parametrize('key,value', [('target', 123), ('features', None), ('group', {}), ('seed', -1), ('test_size', float('nan')), ('models', ['unknown'])])
+def test_invalid_saved_settings_rejected(sample, key, value):
+    data, config = sample
+    report = json.loads(to_json(run_experiment(data, config)))
+    report['config'][key] = value
+    with pytest.raises(ValueError, match='damaged'):
+        validate_saved_report(report)

@@ -2,8 +2,8 @@
 
 Checked locally on Windows 11 with Python 3.12.14 on 2 October 2026.
 
-- `python -m pytest -q`: 59 tests passed, including the final application changes.
-- Coverage.py 7.16.2 measured 90% combined statement/branch coverage across the application, including 93% in evaluation and 100% in report generation. Coverage is a measurement, not proof of correctness.
+- `python -m pytest -q`: 70 tests passed, including the final application changes.
+- Coverage.py 7.16.2 measured 89% combined statement/branch coverage across the application, including 93% in evaluation and 100% in report generation. Coverage is a measurement, not proof of correctness.
 - Additional checks cover malformed/NUL/UTF-8/BOM/multiline CSV input, size limits, split boundary seeds/fractions, numeric dates, extreme numbers, sparse preprocessing, cancellation races, closing during work, protected export paths, atomic export failure, corrupt JSON history and HTML injection attempts.
 - 300 deterministic random-byte CSV cases were rejected without an unexpected exception. A fictional 50,000-row, eight-feature dataset completed both models in about six seconds while other checks were running. This does not validate the simultaneous 200-column/100-MB worst case.
 - `python -m bandit -r modelcheck run.py`: no flagged issues.
